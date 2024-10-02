@@ -966,7 +966,7 @@ builtin_eval_impl(PyObject *module, PyObject *source, PyObject *globals,
                 "code object passed to eval() may not contain free variables");
             return NULL;
         }
-        return PyEval_EvalCode(source, globals, locals);
+        return PyEval_EvalCode(source, globals, locals, NULL);
     }
 
     PyCompilerFlags cf = _PyCompilerFlags_INIT;
@@ -1055,7 +1055,7 @@ builtin_exec_impl(PyObject *module, PyObject *source, PyObject *globals,
                 "contain free variables");
             return NULL;
         }
-        v = PyEval_EvalCode(source, globals, locals);
+        v = PyEval_EvalCode(source, globals, locals, NULL);
     }
     else {
         PyObject *source_copy;

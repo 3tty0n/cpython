@@ -16,6 +16,7 @@ static PyMemberDef frame_memberlist[] = {
     {"f_code",          T_OBJECT,       OFF(f_code),      READONLY|PY_AUDIT_READ},
     {"f_builtins",      T_OBJECT,       OFF(f_builtins),  READONLY},
     {"f_globals",       T_OBJECT,       OFF(f_globals),   READONLY},
+    {"f_variables",     T_OBJECT,       OFF(f_variables), READONLY|PY_AUDIT_READ},
     {"f_trace_lines",   T_BOOL,         OFF(f_trace_lines), 0},
     {"f_trace_opcodes", T_BOOL,         OFF(f_trace_opcodes), 0},
     {NULL}      /* Sentinel */
@@ -600,6 +601,7 @@ frame_dealloc(PyFrameObject *f)
     Py_XDECREF(f->f_back);
     Py_DECREF(f->f_builtins);
     Py_DECREF(f->f_globals);
+    Py_DECREF(f->f_variables);
     Py_CLEAR(f->f_locals);
     Py_CLEAR(f->f_trace);
 
@@ -643,6 +645,7 @@ frame_traverse(PyFrameObject *f, visitproc visit, void *arg)
     Py_VISIT(f->f_code);
     Py_VISIT(f->f_builtins);
     Py_VISIT(f->f_globals);
+    Py_VISIT(f->f_variables);
     Py_VISIT(f->f_locals);
     Py_VISIT(f->f_trace);
 
@@ -833,6 +836,7 @@ _PyFrame_New_NoTrack(PyThreadState *tstate, PyFrameConstructor *con, PyObject *l
 {
     assert(con != NULL);
     assert(con->fc_globals != NULL);
+    assert(con->fc_variables != NULL);
     assert(con->fc_builtins != NULL);
     assert(con->fc_code != NULL);
     assert(locals == NULL || PyMapping_Check(locals));
@@ -846,6 +850,7 @@ _PyFrame_New_NoTrack(PyThreadState *tstate, PyFrameConstructor *con, PyObject *l
     f->f_code = (PyCodeObject *)Py_NewRef(con->fc_code);
     f->f_builtins = Py_NewRef(con->fc_builtins);
     f->f_globals = Py_NewRef(con->fc_globals);
+    f->f_variables = Py_NewRef(con->fc_variables);
     f->f_locals = Py_XNewRef(locals);
     // f_valuestack initialized by frame_alloc()
     f->f_trace = NULL;
@@ -864,7 +869,7 @@ _PyFrame_New_NoTrack(PyThreadState *tstate, PyFrameConstructor *con, PyObject *l
 /* Legacy API */
 PyFrameObject*
 PyFrame_New(PyThreadState *tstate, PyCodeObject *code,
-            PyObject *globals, PyObject *locals)
+            PyObject *globals, PyObject *locals, PyObject *variables)
 {
     PyObject *builtins = _PyEval_BuiltinsFromGlobals(tstate, globals); // borrowed ref
     if (builtins == NULL) {
@@ -872,6 +877,7 @@ PyFrame_New(PyThreadState *tstate, PyCodeObject *code,
     }
     PyFrameConstructor desc = {
         .fc_globals = globals,
+        .fc_variables = variables,
         .fc_builtins = builtins,
         .fc_name = code->co_name,
         .fc_qualname = code->co_name,

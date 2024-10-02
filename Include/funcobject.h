@@ -11,6 +11,7 @@ extern "C" {
 #define COMMON_FIELDS(PREFIX) \
     PyObject *PREFIX ## globals; \
     PyObject *PREFIX ## builtins; \
+    PyObject *PREFIX ## variables; \
     PyObject *PREFIX ## name; \
     PyObject *PREFIX ## qualname; \
     PyObject *PREFIX ## code;        /* A code object, the __code__ attribute */ \
@@ -92,6 +93,8 @@ PyAPI_FUNC(PyObject *) _PyFunction_Vectorcall(
         (((PyFunctionObject *)func) -> func_closure)
 #define PyFunction_GET_ANNOTATIONS(func) \
         (((PyFunctionObject *)func) -> func_annotations)
+#define PyFunction_GET_VARIABLES(func) \
+        (((PyFunctionObject *)func) -> func_variables)
 
 #define PyFunction_AS_FRAME_CONSTRUCTOR(func) \
         ((PyFrameConstructor *)&((PyFunctionObject *)(func))->func_globals)

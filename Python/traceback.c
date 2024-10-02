@@ -275,7 +275,7 @@ void _PyTraceback_Add(const char *funcname, const char *filename, int lineno)
         Py_DECREF(globals);
         goto error;
     }
-    frame = PyFrame_New(PyThreadState_Get(), code, globals, NULL);
+    frame = PyFrame_New(PyThreadState_Get(), code, globals, NULL, NULL);
     Py_DECREF(globals);
     Py_DECREF(code);
     if (!frame)
@@ -948,4 +948,3 @@ _Py_DumpTracebackThreads(int fd, PyInterpreterState *interp,
 
     return NULL;
 }
-

@@ -31,6 +31,7 @@ struct _frame {
     PyCodeObject *f_code;       /* code segment */
     PyObject *f_builtins;       /* builtin symbol table (PyDictObject) */
     PyObject *f_globals;        /* global symbol table (PyDictObject) */
+    PyObject *f_variables;      /* global symbol table for tracking variable changes */
     PyObject *f_locals;         /* local symbol table (any mapping) */
     PyObject **f_valuestack;    /* points after the last local */
     PyObject *f_trace;          /* Trace function */
@@ -68,7 +69,7 @@ PyAPI_DATA(PyTypeObject) PyFrame_Type;
 #define PyFrame_Check(op) Py_IS_TYPE(op, &PyFrame_Type)
 
 PyAPI_FUNC(PyFrameObject *) PyFrame_New(PyThreadState *, PyCodeObject *,
-                                        PyObject *, PyObject *);
+                                        PyObject *, PyObject *, PyObject *);
 
 /* only internal use */
 PyFrameObject*

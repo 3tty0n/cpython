@@ -7,6 +7,7 @@
 
 /* enable more aggressive intra-module optimizations, where available */
 /* affects both release and debug builds - see bpo-43271 */
+#include <stdio.h>
 #define PY_LOCAL_AGGRESSIVE
 
 #include "Python.h"
@@ -1111,7 +1112,7 @@ static int unpack_iterable(PyThreadState *, PyObject *, int, int, PyObject **);
 
 
 PyObject *
-PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
+PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals, PyObject *variables)
 {
     PyThreadState *tstate = PyThreadState_GET();
     if (locals == NULL) {
@@ -1123,6 +1124,7 @@ PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
     }
     PyFrameConstructor desc = {
         .fc_globals = globals,
+        .fc_variables = variables,
         .fc_builtins = builtins,
         .fc_name = ((PyCodeObject *)co)->co_name,
         .fc_qualname = ((PyCodeObject *)co)->co_name,
@@ -1571,6 +1573,18 @@ eval_frame_handle_pending(PyThreadState *tstate)
 #define OPCACHE_STAT_ATTR_TOTAL()
 
 #endif
+
+static char*
+getrepr(PyObject *obj) {
+    PyObject* repr = PyObject_Repr(obj);
+    PyObject* str = PyUnicode_AsEncodedString(repr, "utf-8", "~E~");
+    const char *bytes = PyBytes_AS_STRING(str);
+
+    Py_XDECREF(repr);
+    Py_XDECREF(str);
+
+    return bytes;
+}
 
 
 PyObject* _Py_HOT_FUNCTION
@@ -2756,9 +2770,13 @@ main_loop:
         }
 
         case TARGET(STORE_NAME): {
+            // TODO: Capture the pair of `v' and `name'
             PyObject *name = GETITEM(names, oparg);
             PyObject *v = POP();
             PyObject *ns = f->f_locals;
+            char* name_repr = getrepr(name);
+            char* v_repr = getrepr(v);
+            printf("STORE: { name: %s, value: %s }\n", name_repr, v_repr);
             int err;
             if (ns == NULL) {
                 _PyErr_Format(tstate, PyExc_SystemError,
@@ -2951,6 +2969,9 @@ main_loop:
                     }
                 }
             }
+            char* name_repr = getrepr(name);
+            char* v_repr = getrepr(v);
+            printf("LOAD: { name: %s, value: %s }\n", name_repr, v_repr);
             PUSH(v);
             DISPATCH();
         }

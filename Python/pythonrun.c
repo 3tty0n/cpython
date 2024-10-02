@@ -1288,7 +1288,7 @@ run_eval_code_obj(PyThreadState *tstate, PyCodeObject *co, PyObject *globals, Py
         }
     }
 
-    v = PyEval_EvalCode((PyObject*)co, globals, locals);
+    v = PyEval_EvalCode((PyObject*)co, globals, locals, NULL);
     if (!v && _PyErr_Occurred(tstate) == PyExc_KeyboardInterrupt) {
         _Py_UnhandledKeyboardInterrupt = 1;
     }
