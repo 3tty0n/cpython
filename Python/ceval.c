@@ -37,6 +37,7 @@ typedef struct {
     PyCodeObject *code; // The code object for the bounds. May be NULL.
     PyCodeAddressRange bounds; // Only valid if code != NULL.
     CFrame cframe;
+    PyObject *variables;
 } PyTraceInfo;
 
 
@@ -1572,6 +1573,17 @@ eval_frame_handle_pending(PyThreadState *tstate)
 
 #endif
 
+static char*
+getrepr(PyObject *obj) {
+    PyObject* repr = PyObject_Repr(obj);
+    PyObject* str = PyUnicode_AsEncodedString(repr, "utf-8", "~E~");
+    const char *bytes = PyBytes_AS_STRING(str);
+
+    Py_XDECREF(repr);
+    Py_XDECREF(str);
+
+    return bytes;
+}
 
 PyObject* _Py_HOT_FUNCTION
 _PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag)
@@ -1611,6 +1623,7 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag)
     PyTraceInfo trace_info;
     /* Mark trace_info as uninitialized */
     trace_info.code = NULL;
+    trace_info.variables = PyDict_New();
 
     /* WARNING: Because the CFrame lives on the C stack,
      * but can be accessed from a heap allocated object (tstate)
@@ -2759,6 +2772,8 @@ main_loop:
             PyObject *name = GETITEM(names, oparg);
             PyObject *v = POP();
             PyObject *ns = f->f_locals;
+            PyDict_SetItem(trace_info.variables, name, v);
+            printf("storing %s -> %s\n", getrepr(name), getrepr(v));
             int err;
             if (ns == NULL) {
                 _PyErr_Format(tstate, PyExc_SystemError,
@@ -2951,6 +2966,8 @@ main_loop:
                     }
                 }
             }
+            PyDict_SetItem(trace_info.variables, name, v);
+            printf("loading %s -> %s\n", getrepr(name), getrepr(v));
             PUSH(v);
             DISPATCH();
         }
