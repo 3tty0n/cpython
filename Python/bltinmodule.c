@@ -913,7 +913,7 @@ If only globals is given, locals defaults to it.
 
 static PyObject *
 builtin_eval_impl(PyObject *module, PyObject *source, PyObject *globals,
-                  PyObject *locals)
+                  PyObject *locals, PyObject *variabels)
 /*[clinic end generated code: output=0a0824aa70093116 input=11ee718a8640e527]*/
 {
     PyObject *result, *source_copy;
@@ -966,7 +966,7 @@ builtin_eval_impl(PyObject *module, PyObject *source, PyObject *globals,
                 "code object passed to eval() may not contain free variables");
             return NULL;
         }
-        return PyEval_EvalCode(source, globals, locals);
+        return PyEval_EvalCode(source, globals, locals, variabels);
     }
 
     PyCompilerFlags cf = _PyCompilerFlags_INIT;
@@ -979,7 +979,7 @@ builtin_eval_impl(PyObject *module, PyObject *source, PyObject *globals,
         str++;
 
     (void)PyEval_MergeCompilerFlags(&cf);
-    result = PyRun_StringFlags(str, Py_eval_input, globals, locals, &cf);
+    result = PyRun_StringFlags(str, Py_eval_input, globals, locals, &cf, variabels);
     Py_XDECREF(source_copy);
     return result;
 }
@@ -1003,7 +1003,7 @@ If only globals is given, locals defaults to it.
 
 static PyObject *
 builtin_exec_impl(PyObject *module, PyObject *source, PyObject *globals,
-                  PyObject *locals)
+                  PyObject *locals, PyObject *variables)
 /*[clinic end generated code: output=3c90efc6ab68ef5d input=01ca3e1c01692829]*/
 {
     PyObject *v;
@@ -1055,7 +1055,7 @@ builtin_exec_impl(PyObject *module, PyObject *source, PyObject *globals,
                 "contain free variables");
             return NULL;
         }
-        v = PyEval_EvalCode(source, globals, locals);
+        v = PyEval_EvalCode(source, globals, locals, variables);
     }
     else {
         PyObject *source_copy;
@@ -1069,9 +1069,9 @@ builtin_exec_impl(PyObject *module, PyObject *source, PyObject *globals,
             return NULL;
         if (PyEval_MergeCompilerFlags(&cf))
             v = PyRun_StringFlags(str, Py_file_input, globals,
-                                  locals, &cf);
+                                  locals, &cf, variables);
         else
-            v = PyRun_String(str, Py_file_input, globals, locals);
+            v = PyRun_String(str, Py_file_input, globals, locals, variables);
         Py_XDECREF(source_copy);
     }
     if (v == NULL)

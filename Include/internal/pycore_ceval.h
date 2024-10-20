@@ -41,9 +41,9 @@ extern PyObject *_PyEval_BuiltinsFromGlobals(
 
 
 static inline PyObject*
-_PyEval_EvalFrame(PyThreadState *tstate, PyFrameObject *f, int throwflag)
+_PyEval_EvalFrame(PyThreadState *tstate, PyFrameObject *f, int throwflag, PyObject *variables)
 {
-    return tstate->interp->eval_frame(tstate, f, throwflag);
+    return tstate->interp->eval_frame(tstate, f, throwflag, variables);
 }
 
 extern PyObject *

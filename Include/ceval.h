@@ -70,8 +70,8 @@ PyAPI_FUNC(void) Py_LeaveRecursiveCall(void);
 PyAPI_FUNC(const char *) PyEval_GetFuncName(PyObject *);
 PyAPI_FUNC(const char *) PyEval_GetFuncDesc(PyObject *);
 
-PyAPI_FUNC(PyObject *) PyEval_EvalFrame(PyFrameObject *);
-PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx(PyFrameObject *f, int exc);
+PyAPI_FUNC(PyObject *) PyEval_EvalFrame(PyFrameObject *, PyObject *);
+PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx(PyFrameObject *f, int exc, PyObject *variables);
 
 /* Interface for threads.
 

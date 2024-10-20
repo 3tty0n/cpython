@@ -786,11 +786,11 @@ module_dict_for_exec(PyThreadState *tstate, PyObject *name)
 
 static PyObject *
 exec_code_in_module(PyThreadState *tstate, PyObject *name,
-                    PyObject *module_dict, PyObject *code_object)
+                    PyObject *module_dict, PyObject *code_object, PyObject *variables)
 {
     PyObject *v, *m;
 
-    v = PyEval_EvalCode(code_object, module_dict, module_dict);
+    v = PyEval_EvalCode(code_object, module_dict, module_dict, variables);
     if (v == NULL) {
         remove_module(tstate, name);
         return NULL;
@@ -813,6 +813,7 @@ PyImport_ExecCodeModuleObject(PyObject *name, PyObject *co, PyObject *pathname,
 {
     PyThreadState *tstate = _PyThreadState_GET();
     PyObject *d, *external, *res;
+    PyObject *variables = PyDict_New();
     _Py_IDENTIFIER(_fix_up_module);
 
     d = module_dict_for_exec(tstate, name);
@@ -835,7 +836,7 @@ PyImport_ExecCodeModuleObject(PyObject *name, PyObject *co, PyObject *pathname,
     Py_DECREF(external);
     if (res != NULL) {
         Py_DECREF(res);
-        res = exec_code_in_module(tstate, name, d, co);
+        res = exec_code_in_module(tstate, name, d, co, variables);
     }
     Py_DECREF(d);
     return res;
@@ -1146,6 +1147,8 @@ PyImport_ImportFrozenModuleObject(PyObject *name)
     int ispackage;
     int size;
 
+    PyObject *variables = PyDict_New();
+
     p = find_frozen(name);
 
     if (p == NULL)
@@ -1192,7 +1195,7 @@ PyImport_ImportFrozenModuleObject(PyObject *name)
     if (d == NULL) {
         goto err_return;
     }
-    m = exec_code_in_module(tstate, name, d, co);
+    m = exec_code_in_module(tstate, name, d, co, variables);
     Py_DECREF(d);
     if (m == NULL) {
         goto err_return;

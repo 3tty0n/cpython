@@ -42,7 +42,7 @@ PyAPI_FUNC(int) _PyRun_InteractiveLoopObject(
 
 
 PyAPI_FUNC(PyObject *) PyRun_StringFlags(const char *, int, PyObject *,
-                                         PyObject *, PyCompilerFlags *);
+                                         PyObject *, PyCompilerFlags *, PyObject * /* variables */);
 
 PyAPI_FUNC(PyObject *) PyRun_FileExFlags(
     FILE *fp,
@@ -51,7 +51,8 @@ PyAPI_FUNC(PyObject *) PyRun_FileExFlags(
     PyObject *globals,
     PyObject *locals,
     int closeit,
-    PyCompilerFlags *flags);
+    PyCompilerFlags *flags,
+    PyObject *variables);
 
 
 PyAPI_FUNC(PyObject *) Py_CompileStringExFlags(
@@ -82,7 +83,7 @@ PyAPI_FUNC(const char *) _Py_SourceAsString(
     libpython is accessed directly rather than using header files which defines
     macros below. On Windows, for example, PyAPI_FUNC() uses dllexport to
     export functions in pythonXX.dll. */
-PyAPI_FUNC(PyObject *) PyRun_String(const char *str, int s, PyObject *g, PyObject *l);
+PyAPI_FUNC(PyObject *) PyRun_String(const char *str, int s, PyObject *g, PyObject *l, PyObject *v);
 PyAPI_FUNC(int) PyRun_AnyFile(FILE *fp, const char *name);
 PyAPI_FUNC(int) PyRun_AnyFileEx(FILE *fp, const char *name, int closeit);
 PyAPI_FUNC(int) PyRun_AnyFileFlags(FILE *, const char *, PyCompilerFlags *);
@@ -91,12 +92,12 @@ PyAPI_FUNC(int) PyRun_SimpleFile(FILE *f, const char *p);
 PyAPI_FUNC(int) PyRun_SimpleFileEx(FILE *f, const char *p, int c);
 PyAPI_FUNC(int) PyRun_InteractiveOne(FILE *f, const char *p);
 PyAPI_FUNC(int) PyRun_InteractiveLoop(FILE *f, const char *p);
-PyAPI_FUNC(PyObject *) PyRun_File(FILE *fp, const char *p, int s, PyObject *g, PyObject *l);
-PyAPI_FUNC(PyObject *) PyRun_FileEx(FILE *fp, const char *p, int s, PyObject *g, PyObject *l, int c);
-PyAPI_FUNC(PyObject *) PyRun_FileFlags(FILE *fp, const char *p, int s, PyObject *g, PyObject *l, PyCompilerFlags *flags);
+PyAPI_FUNC(PyObject *) PyRun_File(FILE *fp, const char *p, int s, PyObject *g, PyObject *l, PyObject *v);
+PyAPI_FUNC(PyObject *) PyRun_FileEx(FILE *fp, const char *p, int s, PyObject *g, PyObject *l, int c, PyObject *v);
+PyAPI_FUNC(PyObject *) PyRun_FileFlags(FILE *fp, const char *p, int s, PyObject *g, PyObject *l, PyCompilerFlags *flags, PyObject *v);
 
 /* Use macros for a bunch of old variants */
-#define PyRun_String(str, s, g, l) PyRun_StringFlags(str, s, g, l, NULL)
+#define PyRun_String(str, s, g, l, v) PyRun_StringFlags(str, s, g, l, NULL, v)
 #define PyRun_AnyFile(fp, name) PyRun_AnyFileExFlags(fp, name, 0, NULL)
 #define PyRun_AnyFileEx(fp, name, closeit) \
     PyRun_AnyFileExFlags(fp, name, closeit, NULL)

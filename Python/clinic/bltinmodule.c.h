@@ -299,7 +299,7 @@ PyDoc_STRVAR(builtin_eval__doc__,
 
 static PyObject *
 builtin_eval_impl(PyObject *module, PyObject *source, PyObject *globals,
-                  PyObject *locals);
+                  PyObject *locals, PyObject *variables);
 
 static PyObject *
 builtin_eval(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
@@ -308,6 +308,7 @@ builtin_eval(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     PyObject *source;
     PyObject *globals = Py_None;
     PyObject *locals = Py_None;
+    PyObject *variables = PyDict_New();
 
     if (!_PyArg_CheckPositional("eval", nargs, 1, 3)) {
         goto exit;
@@ -322,7 +323,7 @@ builtin_eval(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     }
     locals = args[2];
 skip_optional:
-    return_value = builtin_eval_impl(module, source, globals, locals);
+    return_value = builtin_eval_impl(module, source, globals, locals, variables);
 
 exit:
     return return_value;
@@ -345,7 +346,7 @@ PyDoc_STRVAR(builtin_exec__doc__,
 
 static PyObject *
 builtin_exec_impl(PyObject *module, PyObject *source, PyObject *globals,
-                  PyObject *locals);
+                  PyObject *locals, PyObject *variable);
 
 static PyObject *
 builtin_exec(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
@@ -354,6 +355,7 @@ builtin_exec(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     PyObject *source;
     PyObject *globals = Py_None;
     PyObject *locals = Py_None;
+    PyObject *variables = PyDict_New();
 
     if (!_PyArg_CheckPositional("exec", nargs, 1, 3)) {
         goto exit;
@@ -368,7 +370,7 @@ builtin_exec(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     }
     locals = args[2];
 skip_optional:
-    return_value = builtin_exec_impl(module, source, globals, locals);
+    return_value = builtin_exec_impl(module, source, globals, locals, variables);
 
 exit:
     return return_value;

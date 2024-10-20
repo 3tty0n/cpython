@@ -38,6 +38,7 @@ typedef struct {
     PyCodeAddressRange bounds; // Only valid if code != NULL.
     CFrame cframe;
     PyObject *variables;
+    int vartrack;
 } PyTraceInfo;
 
 
@@ -1112,7 +1113,7 @@ static int unpack_iterable(PyThreadState *, PyObject *, int, int, PyObject **);
 
 
 PyObject *
-PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
+PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals, PyObject *variables)
 {
     PyThreadState *tstate = PyThreadState_GET();
     if (locals == NULL) {
@@ -1139,18 +1140,18 @@ PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
 /* Interpreter main loop */
 
 PyObject *
-PyEval_EvalFrame(PyFrameObject *f)
+PyEval_EvalFrame(PyFrameObject *f, PyObject *variables)
 {
     /* Function kept for backward compatibility */
     PyThreadState *tstate = _PyThreadState_GET();
-    return _PyEval_EvalFrame(tstate, f, 0);
+    return _PyEval_EvalFrame(tstate, f, 0, variables);
 }
 
 PyObject *
-PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
+PyEval_EvalFrameEx(PyFrameObject *f, int throwflag, PyObject *variables)
 {
     PyThreadState *tstate = _PyThreadState_GET();
-    return _PyEval_EvalFrame(tstate, f, throwflag);
+    return _PyEval_EvalFrame(tstate, f, throwflag, variables);
 }
 
 
@@ -1585,8 +1586,10 @@ getrepr(PyObject *obj) {
     return bytes;
 }
 
+int VARTRACK = 0;
+
 PyObject* _Py_HOT_FUNCTION
-_PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag)
+_PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag, PyObject* variables)
 {
     _Py_EnsureTstateNotNULL(tstate);
 
@@ -1623,7 +1626,6 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag)
     PyTraceInfo trace_info;
     /* Mark trace_info as uninitialized */
     trace_info.code = NULL;
-    trace_info.variables = PyDict_New();
 
     /* WARNING: Because the CFrame lives on the C stack,
      * but can be accessed from a heap allocated object (tstate)
@@ -2772,8 +2774,19 @@ main_loop:
             PyObject *name = GETITEM(names, oparg);
             PyObject *v = POP();
             PyObject *ns = f->f_locals;
-            PyDict_SetItem(trace_info.variables, name, v);
-            printf("storing %s -> %s\n", getrepr(name), getrepr(v));
+
+            if (VARTRACK) {
+                PyDict_SetItem(variables, name, v);
+                PyObject_Print(variables, stderr, 0);
+                fprintf(stderr, "\n");
+                Py_ssize_t size = PyDict_Size(variables);
+                fprintf(stderr, "size: %ld\n", size);
+            }
+
+            PyObject *readline_available = PyUnicode_FromString("_readline_available");
+            int cmp = PyObject_RichCompareBool(name, readline_available, Py_EQ);
+            if (cmp) VARTRACK = 1;
+
             int err;
             if (ns == NULL) {
                 _PyErr_Format(tstate, PyExc_SystemError,
@@ -2966,8 +2979,13 @@ main_loop:
                     }
                 }
             }
-            PyDict_SetItem(trace_info.variables, name, v);
-            printf("loading %s -> %s\n", getrepr(name), getrepr(v));
+            if (VARTRACK) {
+                PyDict_SetItem(variables, name, v);
+                Py_ssize_t size = PyDict_Size(trace_info.variables);
+                fprintf(stderr, "size: %ld\n", size);
+                PyObject_Print(variables, stderr, 0);
+                fprintf(stderr, "\n");
+            }
             PUSH(v);
             DISPATCH();
         }
@@ -5081,7 +5099,8 @@ _PyEval_Vector(PyThreadState *tstate, PyFrameConstructor *con,
     if (((PyCodeObject *)con->fc_code)->co_flags & (CO_GENERATOR | CO_COROUTINE | CO_ASYNC_GENERATOR)) {
         return make_coro(con, f);
     }
-    PyObject *retval = _PyEval_EvalFrame(tstate, f, 0);
+    PyObject *variables = PyDict_New();
+    PyObject *retval = _PyEval_EvalFrame(tstate, f, 0, variables);
 
     /* decref'ing the frame can cause __del__ methods to get invoked,
        which can call back into Python.  While we're done with the
