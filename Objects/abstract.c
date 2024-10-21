@@ -114,7 +114,7 @@ PyObject_LengthHint(PyObject *o, Py_ssize_t defaultvalue)
         }
         return defaultvalue;
     }
-    result = _PyObject_CallNoArg(hint);
+    result = _PyObject_CallNoArg(hint, PyDict_New());
     Py_DECREF(hint);
     if (result == NULL) {
         PyThreadState *tstate = _PyThreadState_GET();
@@ -188,7 +188,7 @@ PyObject_GetItem(PyObject *o, PyObject *key)
             return NULL;
         }
         if (meth) {
-            result = PyObject_CallOneArg(meth, key);
+            result = PyObject_CallOneArg(meth, key, PyDict_New());
             Py_DECREF(meth);
             return result;
         }
@@ -808,7 +808,7 @@ PyObject_Format(PyObject *obj, PyObject *format_spec)
     }
 
     /* And call it. */
-    result = PyObject_CallOneArg(meth, format_spec);
+    result = PyObject_CallOneArg(meth, format_spec, PyDict_New());
     Py_DECREF(meth);
 
     if (result && !PyUnicode_Check(result)) {
@@ -1576,7 +1576,7 @@ PyNumber_Long(PyObject *o)
     }
     trunc_func = _PyObject_LookupSpecial(o, &PyId___trunc__);
     if (trunc_func) {
-        result = _PyObject_CallNoArg(trunc_func);
+        result = _PyObject_CallNoArg(trunc_func, PyDict_New());
         Py_DECREF(trunc_func);
         if (result == NULL || PyLong_CheckExact(result)) {
             return result;
@@ -2670,7 +2670,7 @@ object_recursive_isinstance(PyThreadState *tstate, PyObject *inst, PyObject *cls
             return -1;
         }
 
-        PyObject *res = PyObject_CallOneArg(checker, inst);
+        PyObject *res = PyObject_CallOneArg(checker, inst,  PyDict_New());
         _Py_LeaveRecursiveCall(tstate);
         Py_DECREF(checker);
 
@@ -2758,7 +2758,7 @@ object_issubclass(PyThreadState *tstate, PyObject *derived, PyObject *cls)
             Py_DECREF(checker);
             return ok;
         }
-        PyObject *res = PyObject_CallOneArg(checker, derived);
+        PyObject *res = PyObject_CallOneArg(checker, derived, PyDict_New());
         _Py_LeaveRecursiveCall(tstate);
         Py_DECREF(checker);
         if (res != NULL) {

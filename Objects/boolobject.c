@@ -57,7 +57,7 @@ bool_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 static PyObject *
 bool_vectorcall(PyObject *type, PyObject * const*args,
-                size_t nargsf, PyObject *kwnames)
+                size_t nargsf, PyObject *kwnames, PyObject *variables)
 {
     long ok = 0;
     if (!_PyArg_NoKwnames("bool", kwnames)) {

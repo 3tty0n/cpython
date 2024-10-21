@@ -65,7 +65,7 @@ typedef int (*getbufferproc)(PyObject *, Py_buffer *, int);
 typedef void (*releasebufferproc)(PyObject *, Py_buffer *);
 
 typedef PyObject *(*vectorcallfunc)(PyObject *callable, PyObject *const *args,
-                                    size_t nargsf, PyObject *kwnames);
+                                    size_t nargsf, PyObject *kwnames, PyObject *variables);
 
 /* Maximum number of dimensions */
 #define PyBUF_MAX_NDIM 64

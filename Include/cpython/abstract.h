@@ -98,7 +98,7 @@ PyVectorcall_Function(PyObject *callable)
 static inline PyObject *
 _PyObject_VectorcallTstate(PyThreadState *tstate, PyObject *callable,
                            PyObject *const *args, size_t nargsf,
-                           PyObject *kwnames)
+                           PyObject *kwnames, PyObject *variables)
 {
     vectorcallfunc func;
     PyObject *res;
@@ -111,17 +111,17 @@ _PyObject_VectorcallTstate(PyThreadState *tstate, PyObject *callable,
         Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
         return _PyObject_MakeTpCall(tstate, callable, args, nargs, kwnames);
     }
-    res = func(callable, args, nargsf, kwnames);
+    res = func(callable, args, nargsf, kwnames, variables);
     return _Py_CheckFunctionResult(tstate, callable, res, NULL);
 }
 
 static inline PyObject *
 PyObject_Vectorcall(PyObject *callable, PyObject *const *args,
-                     size_t nargsf, PyObject *kwnames)
+                    size_t nargsf, PyObject *kwnames, PyObject *variables)
 {
     PyThreadState *tstate = PyThreadState_Get();
     return _PyObject_VectorcallTstate(tstate, callable,
-                                      args, nargsf, kwnames);
+                                      args, nargsf, kwnames, variables);
 }
 
 // Backwards compatibility aliases for API that was provisional in Python 3.8
@@ -146,30 +146,30 @@ PyAPI_FUNC(PyObject *) PyObject_VectorcallDict(
 PyAPI_FUNC(PyObject *) PyVectorcall_Call(PyObject *callable, PyObject *tuple, PyObject *dict);
 
 static inline PyObject *
-_PyObject_FastCallTstate(PyThreadState *tstate, PyObject *func, PyObject *const *args, Py_ssize_t nargs)
+_PyObject_FastCallTstate(PyThreadState *tstate, PyObject *func, PyObject *const *args, Py_ssize_t nargs, PyObject *variables)
 {
-    return _PyObject_VectorcallTstate(tstate, func, args, (size_t)nargs, NULL);
+    return _PyObject_VectorcallTstate(tstate, func, args, (size_t)nargs, NULL, variables);
 }
 
 /* Same as PyObject_Vectorcall except without keyword arguments */
 static inline PyObject *
-_PyObject_FastCall(PyObject *func, PyObject *const *args, Py_ssize_t nargs)
+_PyObject_FastCall(PyObject *func, PyObject *const *args, Py_ssize_t nargs, PyObject *variables)
 {
     PyThreadState *tstate = PyThreadState_Get();
-    return _PyObject_FastCallTstate(tstate, func, args, nargs);
+    return _PyObject_FastCallTstate(tstate, func, args, nargs, variables);
 }
 
 /* Call a callable without any arguments
    Private static inline function variant of public function
    PyObject_CallNoArgs(). */
 static inline PyObject *
-_PyObject_CallNoArg(PyObject *func) {
+_PyObject_CallNoArg(PyObject *func, PyObject *variables) {
     PyThreadState *tstate = PyThreadState_Get();
-    return _PyObject_VectorcallTstate(tstate, func, NULL, 0, NULL);
+    return _PyObject_VectorcallTstate(tstate, func, NULL, 0, NULL, variables);
 }
 
 static inline PyObject *
-PyObject_CallOneArg(PyObject *func, PyObject *arg)
+PyObject_CallOneArg(PyObject *func, PyObject *arg, PyObject *variables)
 {
     PyObject *_args[2];
     PyObject **args;
@@ -181,7 +181,7 @@ PyObject_CallOneArg(PyObject *func, PyObject *arg)
     args[0] = arg;
     tstate = PyThreadState_Get();
     nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
-    return _PyObject_VectorcallTstate(tstate, func, args, nargsf, NULL);
+    return _PyObject_VectorcallTstate(tstate, func, args, nargsf, NULL, variables);
 }
 
 PyAPI_FUNC(PyObject *) PyObject_VectorcallMethod(

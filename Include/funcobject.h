@@ -73,7 +73,8 @@ PyAPI_FUNC(PyObject *) _PyFunction_Vectorcall(
     PyObject *func,
     PyObject *const *stack,
     size_t nargsf,
-    PyObject *kwnames);
+    PyObject *kwnames,
+    PyObject *variables);
 #endif
 
 /* Macros for direct access to these values. Type checks are *not*

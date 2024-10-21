@@ -118,7 +118,7 @@ _PyPegen_new_identifier(Parser *p, const char *n)
             goto error;
         }
         PyObject *args[2] = {form, id};
-        id2 = _PyObject_FastCall(p->normalize, args, 2);
+        id2 = _PyObject_FastCall(p->normalize, args, 2, PyDict_New());
         Py_DECREF(id);
         Py_DECREF(form);
         if (!id2) {

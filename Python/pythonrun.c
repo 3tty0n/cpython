@@ -25,6 +25,7 @@
 #include "errcode.h"              // E_EOF
 #include "code.h"                 // PyCodeObject
 #include "marshal.h"              // PyMarshal_ReadLongFromFile()
+#include <stdio.h>
 
 #ifdef MS_WINDOWS
 #  include "malloc.h"             // alloca()
@@ -123,7 +124,7 @@ PyRun_AnyFileExFlags(FILE *fp, const char *filename, int closeit,
 int
 _PyRun_InteractiveLoopObject(FILE *fp, PyObject *filename, PyCompilerFlags *flags, PyObject *variables)
 {
-
+    fprintf(stderr, "interactive loop\n");
     PyCompilerFlags local_flags = _PyCompilerFlags_INIT;
     if (flags == NULL) {
         flags = &local_flags;
@@ -147,8 +148,11 @@ _PyRun_InteractiveLoopObject(FILE *fp, PyObject *filename, PyCompilerFlags *flag
     int ret;
     int nomem_count = 0;
 
+    PyObject *var = PyDict_New();
+
     do {
-        ret = PyRun_InteractiveOneObjectEx(fp, filename, flags, variables);
+        ret = PyRun_InteractiveOneObjectEx(fp, filename, flags, var);
+        PyObject_Print(var, stderr, 0);
         if (ret == -1 && PyErr_Occurred()) {
             /* Prevent an endless loop after multiple consecutive MemoryErrors
              * while still allowing an interactive command to fail with a
@@ -197,7 +201,7 @@ PyRun_InteractiveLoopFlags(FILE *fp, const char *filename, PyCompilerFlags *flag
  * error on failure. */
 static int
 PyRun_InteractiveOneObjectEx(FILE *fp, PyObject *filename,
-                             PyCompilerFlags *flags, PyObject *var)
+                             PyCompilerFlags *flags, PyObject *variables)
 {
     PyObject *m, *d, *v, *w, *oenc = NULL, *mod_name;
     mod_ty mod;
@@ -277,7 +281,7 @@ PyRun_InteractiveOneObjectEx(FILE *fp, PyObject *filename,
         return -1;
     }
     d = PyModule_GetDict(m);
-    v = run_mod(mod, filename, d, d, flags, arena, var);
+    v = run_mod(mod, filename, d, d, flags, arena, variables);
     _PyArena_Free(arena);
     if (v == NULL) {
         return -1;
@@ -288,11 +292,11 @@ PyRun_InteractiveOneObjectEx(FILE *fp, PyObject *filename,
 }
 
 int
-PyRun_InteractiveOneObject(FILE *fp, PyObject *filename, PyCompilerFlags *flags, PyObject *var)
+PyRun_InteractiveOneObject(FILE *fp, PyObject *filename, PyCompilerFlags *flags, PyObject *variables)
 {
     int res;
 
-    res = PyRun_InteractiveOneObjectEx(fp, filename, flags, var);
+    res = PyRun_InteractiveOneObjectEx(fp, filename, flags, variables);
     if (res == -1) {
         PyErr_Print();
         flush_io();
