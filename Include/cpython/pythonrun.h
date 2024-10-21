@@ -2,43 +2,46 @@
 #  error "this header file must not be included directly"
 #endif
 
-PyAPI_FUNC(int) PyRun_SimpleStringFlags(const char *, PyCompilerFlags *);
+PyAPI_FUNC(int) PyRun_SimpleStringFlags(const char *, PyCompilerFlags *, PyObject * /* variables */);
 PyAPI_FUNC(int) _PyRun_SimpleFileObject(
     FILE *fp,
     PyObject *filename,
     int closeit,
-    PyCompilerFlags *flags);
+    PyCompilerFlags *flags, PyObject *variables);
 PyAPI_FUNC(int) PyRun_AnyFileExFlags(
     FILE *fp,
     const char *filename,       /* decoded from the filesystem encoding */
     int closeit,
-    PyCompilerFlags *flags);
+    PyCompilerFlags *flags, PyObject *variables);
 PyAPI_FUNC(int) _PyRun_AnyFileObject(
     FILE *fp,
     PyObject *filename,
     int closeit,
-    PyCompilerFlags *flags);
+    PyCompilerFlags *flags, PyObject *variables);
 PyAPI_FUNC(int) PyRun_SimpleFileExFlags(
     FILE *fp,
     const char *filename,       /* decoded from the filesystem encoding */
     int closeit,
-    PyCompilerFlags *flags);
+    PyCompilerFlags *flags, PyObject *variables);
 PyAPI_FUNC(int) PyRun_InteractiveOneFlags(
     FILE *fp,
     const char *filename,       /* decoded from the filesystem encoding */
-    PyCompilerFlags *flags);
+    PyCompilerFlags *flags, PyObject *variables);
 PyAPI_FUNC(int) PyRun_InteractiveOneObject(
     FILE *fp,
     PyObject *filename,
-    PyCompilerFlags *flags);
+    PyCompilerFlags *flags,
+    PyObject *variables);
 PyAPI_FUNC(int) PyRun_InteractiveLoopFlags(
     FILE *fp,
     const char *filename,       /* decoded from the filesystem encoding */
-    PyCompilerFlags *flags);
+    PyCompilerFlags *flags,
+    PyObject *variables);
 PyAPI_FUNC(int) _PyRun_InteractiveLoopObject(
     FILE *fp,
     PyObject *filename,
-    PyCompilerFlags *flags);
+    PyCompilerFlags *flags,
+    PyObject *variables);
 
 
 PyAPI_FUNC(PyObject *) PyRun_StringFlags(const char *, int, PyObject *,
@@ -84,30 +87,30 @@ PyAPI_FUNC(const char *) _Py_SourceAsString(
     macros below. On Windows, for example, PyAPI_FUNC() uses dllexport to
     export functions in pythonXX.dll. */
 PyAPI_FUNC(PyObject *) PyRun_String(const char *str, int s, PyObject *g, PyObject *l, PyObject *v);
-PyAPI_FUNC(int) PyRun_AnyFile(FILE *fp, const char *name);
-PyAPI_FUNC(int) PyRun_AnyFileEx(FILE *fp, const char *name, int closeit);
-PyAPI_FUNC(int) PyRun_AnyFileFlags(FILE *, const char *, PyCompilerFlags *);
+PyAPI_FUNC(int) PyRun_AnyFile(FILE *fp, const char *name, PyObject *variables);
+PyAPI_FUNC(int) PyRun_AnyFileEx(FILE *fp, const char *name, int closeit, PyObject *variables);
+PyAPI_FUNC(int) PyRun_AnyFileFlags(FILE *, const char *, PyCompilerFlags *, PyObject *variables);
 PyAPI_FUNC(int) PyRun_SimpleString(const char *s);
-PyAPI_FUNC(int) PyRun_SimpleFile(FILE *f, const char *p);
-PyAPI_FUNC(int) PyRun_SimpleFileEx(FILE *f, const char *p, int c);
-PyAPI_FUNC(int) PyRun_InteractiveOne(FILE *f, const char *p);
-PyAPI_FUNC(int) PyRun_InteractiveLoop(FILE *f, const char *p);
+PyAPI_FUNC(int) PyRun_SimpleFile(FILE *f, const char *p, PyObject *variables);
+PyAPI_FUNC(int) PyRun_SimpleFileEx(FILE *f, const char *p, int c, PyObject *variables);
+PyAPI_FUNC(int) PyRun_InteractiveOne(FILE *f, const char *p, PyObject *);
+PyAPI_FUNC(int) PyRun_InteractiveLoop(FILE *f, const char *p, PyObject *);
 PyAPI_FUNC(PyObject *) PyRun_File(FILE *fp, const char *p, int s, PyObject *g, PyObject *l, PyObject *v);
 PyAPI_FUNC(PyObject *) PyRun_FileEx(FILE *fp, const char *p, int s, PyObject *g, PyObject *l, int c, PyObject *v);
 PyAPI_FUNC(PyObject *) PyRun_FileFlags(FILE *fp, const char *p, int s, PyObject *g, PyObject *l, PyCompilerFlags *flags, PyObject *v);
 
 /* Use macros for a bunch of old variants */
 #define PyRun_String(str, s, g, l, v) PyRun_StringFlags(str, s, g, l, NULL, v)
-#define PyRun_AnyFile(fp, name) PyRun_AnyFileExFlags(fp, name, 0, NULL)
+#define PyRun_AnyFile(fp, name) PyRun_AnyFileExFlags(fp, name, 0, NULL, NULL)
 #define PyRun_AnyFileEx(fp, name, closeit) \
     PyRun_AnyFileExFlags(fp, name, closeit, NULL)
-#define PyRun_AnyFileFlags(fp, name, flags) \
-    PyRun_AnyFileExFlags(fp, name, 0, flags)
-#define PyRun_SimpleString(s) PyRun_SimpleStringFlags(s, NULL)
+#define PyRun_AnyFileFlags(fp, name, flags, variables)    \
+    PyRun_AnyFileExFlags(fp, name, 0, flags, variables)
+#define PyRun_SimpleString(s) PyRun_SimpleStringFlags(s, NULL, NULL)
 #define PyRun_SimpleFile(f, p) PyRun_SimpleFileExFlags(f, p, 0, NULL)
-#define PyRun_SimpleFileEx(f, p, c) PyRun_SimpleFileExFlags(f, p, c, NULL)
+#define PyRun_SimpleFileEx(f, p, c) PyRun_SimpleFileExFlags(f, p, c, NULL, NULL)
 #define PyRun_InteractiveOne(f, p) PyRun_InteractiveOneFlags(f, p, NULL)
-#define PyRun_InteractiveLoop(f, p) PyRun_InteractiveLoopFlags(f, p, NULL)
+#define PyRun_InteractiveLoop(f, p) PyRun_InteractiveLoopFlags(f, p, NULL, NULL)
 #define PyRun_File(fp, p, s, g, l) \
     PyRun_FileExFlags(fp, p, s, g, l, 0, NULL)
 #define PyRun_FileEx(fp, p, s, g, l, c) \

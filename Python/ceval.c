@@ -2980,11 +2980,8 @@ main_loop:
                 }
             }
             if (VARTRACK) {
-                PyDict_SetItem(variables, name, v);
                 Py_ssize_t size = PyDict_Size(trace_info.variables);
                 fprintf(stderr, "size: %ld\n", size);
-                PyObject_Print(variables, stderr, 0);
-                fprintf(stderr, "\n");
             }
             PUSH(v);
             DISPATCH();

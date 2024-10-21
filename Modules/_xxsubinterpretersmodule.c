@@ -1887,7 +1887,8 @@ _run_script(PyInterpreterState *interp, const char *codestr,
     }
 
     // Run the string (see PyRun_SimpleStringFlags).
-    PyObject *result = PyRun_StringFlags(codestr, Py_file_input, ns, ns, NULL);
+    PyObject *variables = PyDict_New();
+    PyObject *result = PyRun_StringFlags(codestr, Py_file_input, ns, ns, NULL, variables);
     Py_DECREF(ns);
     if (result == NULL) {
         goto error;

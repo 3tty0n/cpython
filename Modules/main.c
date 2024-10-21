@@ -245,7 +245,8 @@ pymain_run_command(wchar_t *command)
 
     PyCompilerFlags cf = _PyCompilerFlags_INIT;
     cf.cf_flags |= PyCF_IGNORE_COOKIE;
-    ret = PyRun_SimpleStringFlags(PyBytes_AsString(bytes), &cf);
+    PyObject *variables = PyDict_New();
+    ret = PyRun_SimpleStringFlags(PyBytes_AsString(bytes), &cf, variables);
     Py_DECREF(bytes);
     return (ret != 0);
 
@@ -350,7 +351,8 @@ pymain_run_file_obj(PyObject *program_name, PyObject *filename,
 
     /* PyRun_AnyFileExFlags(closeit=1) calls fclose(fp) before running code */
     PyCompilerFlags cf = _PyCompilerFlags_INIT;
-    int run = _PyRun_AnyFileObject(fp, filename, 1, &cf);
+    PyObject *var = PyDict_New();
+    int run = _PyRun_AnyFileObject(fp, filename, 1, &cf, var);
     return (run != 0);
 }
 
@@ -420,7 +422,8 @@ pymain_run_startup(PyConfig *config, int *exitcode)
     }
 
     PyCompilerFlags cf = _PyCompilerFlags_INIT;
-    (void) _PyRun_SimpleFileObject(fp, startup, 0, &cf);
+    PyObject *variables = PyDict_New();
+    (void) _PyRun_SimpleFileObject(fp, startup, 0, &cf, variables);
     PyErr_Clear();
     fclose(fp);
     ret = 0;
@@ -499,7 +502,8 @@ pymain_run_stdin(PyConfig *config)
     }
 
     PyCompilerFlags cf = _PyCompilerFlags_INIT;
-    int run = PyRun_AnyFileExFlags(stdin, "<stdin>", 0, &cf);
+    PyObject *var = PyDict_New();
+    int run = PyRun_AnyFileExFlags(stdin, "<stdin>", 0, &cf, var);
     return (run != 0);
 }
 
@@ -525,7 +529,8 @@ pymain_repl(PyConfig *config, int *exitcode)
     }
 
     PyCompilerFlags cf = _PyCompilerFlags_INIT;
-    int res = PyRun_AnyFileFlags(stdin, "<stdin>", &cf);
+    PyObject *var = PyDict_New();
+    int res = PyRun_AnyFileFlags(stdin, "<stdin>", &cf, var);
     *exitcode = (res != 0);
 }
 
