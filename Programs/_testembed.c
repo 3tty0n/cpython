@@ -332,7 +332,8 @@ dump_config(void)
     (void) PyRun_SimpleStringFlags(
         "import _testinternalcapi, json; "
         "print(json.dumps(_testinternalcapi.get_configs()))",
-        0);
+        0,
+        PyDict_New());
 }
 
 

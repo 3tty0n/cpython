@@ -3670,7 +3670,8 @@ run_in_subinterp(PyObject *self, PyObject *args)
         PyErr_SetString(PyExc_RuntimeError, "sub-interpreter creation failed");
         return NULL;
     }
-    r = PyRun_SimpleStringFlags(code, &cflags);
+    PyObject *variables = PyDict_New();
+    r = PyRun_SimpleStringFlags(code, &cflags, variables);
     Py_EndInterpreter(substate);
 
     PyThreadState_Swap(mainstate);

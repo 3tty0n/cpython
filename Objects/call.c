@@ -338,11 +338,12 @@ _PyFunction_Vectorcall(PyObject *func, PyObject* const* stack,
     assert(nargs >= 0);
     PyThreadState *tstate = _PyThreadState_GET();
     assert(nargs == 0 || stack != NULL);
+    PyObject *variables = PyDict_New(); // XXX workaroud
     if (((PyCodeObject *)f->fc_code)->co_flags & CO_OPTIMIZED) {
-        return _PyEval_Vector(tstate, f, NULL, stack, nargs, kwnames);
+        return _PyEval_Vector(tstate, f, NULL, stack, nargs, kwnames, variables);
     }
     else {
-        return _PyEval_Vector(tstate, f, f->fc_globals, stack, nargs, kwnames);
+        return _PyEval_Vector(tstate, f, f->fc_globals, stack, nargs, kwnames, variables);
     }
 }
 

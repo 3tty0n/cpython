@@ -29,7 +29,12 @@
 #include "opcode.h"
 #include "pydtrace.h"
 #include "setobject.h"
-#include "structmember.h"         // struct PyMemberDef, T_OFFSET_EX
+#include "structmember.h" // struct PyMemberDef, T_OFFSET_EX
+
+#define DEFINE_VARTRACK
+#include "vartrack.h"
+
+int VARTRACK = 0;
 
 #include <ctype.h>
 
@@ -1133,7 +1138,13 @@ PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals, PyObject *var
         .fc_kwdefaults = NULL,
         .fc_closure = NULL
     };
-    return _PyEval_Vector(tstate, &desc, locals, NULL, 0, NULL);
+    PyObject *res = _PyEval_Vector(tstate, &desc, locals, NULL, 0, NULL, variables);
+    if (VARTRACK) {
+        variables = PyDict_Copy(locals);
+        PyObject_Print(variables, stderr, 0);
+        fprintf(stderr, "\n");
+    }
+    return res;
 }
 
 
@@ -1573,20 +1584,6 @@ eval_frame_handle_pending(PyThreadState *tstate)
 #define OPCACHE_STAT_ATTR_TOTAL()
 
 #endif
-
-static char*
-getrepr(PyObject *obj) {
-    PyObject* repr = PyObject_Repr(obj);
-    PyObject* str = PyUnicode_AsEncodedString(repr, "utf-8", "~E~");
-    const char *bytes = PyBytes_AS_STRING(str);
-
-    Py_XDECREF(repr);
-    Py_XDECREF(str);
-
-    return bytes;
-}
-
-int VARTRACK = 0;
 
 PyObject* _Py_HOT_FUNCTION
 _PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag, PyObject* variables)
@@ -2775,18 +2772,6 @@ main_loop:
             PyObject *v = POP();
             PyObject *ns = f->f_locals;
 
-            if (VARTRACK) {
-                PyDict_SetItem(variables, name, v);
-                PyObject_Print(variables, stderr, 0);
-                fprintf(stderr, "\n");
-                Py_ssize_t size = PyDict_Size(variables);
-                fprintf(stderr, "size: %ld\n", size);
-            }
-
-            PyObject *readline_available = PyUnicode_FromString("_readline_available");
-            int cmp = PyObject_RichCompareBool(name, readline_available, Py_EQ);
-            if (cmp) VARTRACK = 1;
-
             int err;
             if (ns == NULL) {
                 _PyErr_Format(tstate, PyExc_SystemError,
@@ -2798,6 +2783,15 @@ main_loop:
                 err = PyDict_SetItem(ns, name, v);
             else
                 err = PyObject_SetItem(ns, name, v);
+
+            if (VARTRACK) {
+                PyDict_SetItem(variables, name, v);
+            }
+
+            PyObject *readline_available = PyUnicode_FromString("_readline_available");
+            int cmp = PyObject_RichCompareBool(name, readline_available, Py_EQ);
+            if (cmp) VARTRACK = 1;
+
             Py_DECREF(v);
             if (err != 0)
                 goto error;
@@ -2978,10 +2972,6 @@ main_loop:
                         }
                     }
                 }
-            }
-            if (VARTRACK) {
-                Py_ssize_t size = PyDict_Size(trace_info.variables);
-                fprintf(stderr, "size: %ld\n", size);
             }
             PUSH(v);
             DISPATCH();
@@ -5086,7 +5076,7 @@ PyObject *
 _PyEval_Vector(PyThreadState *tstate, PyFrameConstructor *con,
                PyObject *locals,
                PyObject* const* args, size_t argcount,
-               PyObject *kwnames)
+               PyObject *kwnames, PyObject *variables)
 {
     PyFrameObject *f = _PyEval_MakeFrameVector(
         tstate, con, locals, args, argcount, kwnames);
@@ -5096,8 +5086,8 @@ _PyEval_Vector(PyThreadState *tstate, PyFrameConstructor *con,
     if (((PyCodeObject *)con->fc_code)->co_flags & (CO_GENERATOR | CO_COROUTINE | CO_ASYNC_GENERATOR)) {
         return make_coro(con, f);
     }
-    PyObject *variables = PyDict_New();
     PyObject *retval = _PyEval_EvalFrame(tstate, f, 0, variables);
+    // PyObject_Print(variables, stderr, 0);
 
     /* decref'ing the frame can cause __del__ methods to get invoked,
        which can call back into Python.  While we're done with the
@@ -5177,9 +5167,10 @@ PyEval_EvalCodeEx(PyObject *_co, PyObject *globals, PyObject *locals,
         .fc_kwdefaults = kwdefs,
         .fc_closure = closure
     };
+    PyObject *variables = PyDict_New();
     res = _PyEval_Vector(tstate, &constr, locals,
                          allargs, argcount,
-                         kwnames);
+                         kwnames, variables);
 fail:
     Py_XDECREF(kwnames);
     PyMem_Free(newargs);
