@@ -33,6 +33,8 @@
 
 #include <ctype.h>
 
+int var_track = 0;
+
 typedef struct {
     PyCodeObject *code; // The code object for the bounds. May be NULL.
     PyCodeAddressRange bounds; // Only valid if code != NULL.
@@ -1109,9 +1111,45 @@ fail:
 static int do_raise(PyThreadState *tstate, PyObject *exc, PyObject *cause);
 static int unpack_iterable(PyThreadState *, PyObject *, int, int, PyObject **);
 
+int id = 0;
+
+PyObject*
+pyobject_gen_id(void) {
+    char s[16];
+    sprintf(s, "__tmpid_%d", id);
+    id++;
+    return PyUnicode_FromString(s);
+}
+
+int
+PyVarTrack_Copy(PyObject *from, PyObject *to) {
+    int err = -1;
+    if (!PyDict_Check(from)) {
+        return err;
+    }
+    return err;
+}
 
 PyObject *
-PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
+PyVarTrack_GetDiff(PyObject *dict1, PyObject *dict2) {
+    PyObject *key;
+    PyObject *dict1_keys = PyDict_Keys(dict1);
+    PyObject *dict2_keys = PyDict_Keys(dict2);
+
+    PyObject *it = PyObject_GetIter(dict1_keys);
+    if (PyDict_CheckExact(dict1)) {
+        while ((key = PyIter_Next(it)) != NULL) {
+            PyObject *dict1_item = PyDict_GetItem(dict1, key);
+            PyObject *dict2_item = PyDict_GetItem(dict2, key);
+
+            int cmp = PyObject_RichCompareBool(dict1_item, dict2_item, Py_EQ);
+        }
+    }
+    return PyDict_New();
+}
+
+PyObject *
+PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals, PyObject *variables)
 {
     PyThreadState *tstate = PyThreadState_GET();
     if (locals == NULL) {
@@ -1131,7 +1169,16 @@ PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
         .fc_kwdefaults = NULL,
         .fc_closure = NULL
     };
-    return _PyEval_Vector(tstate, &desc, locals, NULL, 0, NULL);
+    PyObject *res = _PyEval_Vector(tstate, &desc, locals, NULL, 0, NULL);
+    if (res != NULL && variables != NULL && var_track) {
+        PyObject *id = pyobject_gen_id();
+        PyObject *d = PyDict_New();
+        PyDict_SetItem(variables, id, locals);
+        fprintf(stdout, "locals: ");
+        PyObject_Print(variables, stdout, 0);
+        fprintf(stdout, "\n");
+    }
+    return res;
 }
 
 
@@ -2770,6 +2817,10 @@ main_loop:
                 err = PyDict_SetItem(ns, name, v);
             else
                 err = PyObject_SetItem(ns, name, v);
+            PyObject *readline_available = PyUnicode_FromString("_readline_available");
+            int cmp = PyObject_RichCompareBool(name, readline_available, Py_EQ);
+            if (cmp) var_track = 1;
+
             Py_DECREF(v);
             if (err != 0)
                 goto error;
