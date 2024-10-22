@@ -790,7 +790,7 @@ exec_code_in_module(PyThreadState *tstate, PyObject *name,
 {
     PyObject *v, *m;
 
-    v = PyEval_EvalCode(code_object, module_dict, module_dict);
+    v = PyEval_EvalCode(code_object, module_dict, module_dict, NULL);
     if (v == NULL) {
         remove_module(tstate, name);
         return NULL;
