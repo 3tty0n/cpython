@@ -119,36 +119,16 @@ PyRun_AnyFileExFlags(FILE *fp, const char *filename, int closeit,
 }
 
 void
-PyVarTrack_GetDiff(PyObject *dict1, PyObject *dict2) {
+PyRun_GetDiff(PyObject *dict1, PyObject *dict2) {
     PyObject *key;
     PyObject *dict1_keys = PyDict_Keys(dict1);
     PyObject *dict2_keys = PyDict_Keys(dict2);
 
-    PyObject *skip_candidates[6] = {
-        PyUnicode_FromString("__name__"),
-        PyUnicode_FromString("__doc__"),
-        PyUnicode_FromString("__package__"),
-        PyUnicode_FromString("__loader__"),
-        PyUnicode_FromString("__spec__"),
-        PyUnicode_FromString("__annotations__"),
-    };
-
     PyObject *it = PyObject_GetIter(dict1_keys);
-    int len = sizeof(skip_candidates) / sizeof(skip_candidates[0]);
     while ((key = PyIter_Next(it)) != NULL) {
-        int skip_flg = 0;
-        for (int i = 0; i < len; i++) {
-            PyObject *skip = skip_candidates[i];
-            int cmp = PyUnicode_Compare(key, skip);
-            if (cmp != 1) {
-                skip_flg = 1;
-                break;
-            }
-        }
-        if (skip_flg) continue;
-
         PyObject *v = PyDict_GetItem(dict1, key);
-        if (v == NULL) continue;
+        if (v == NULL)
+            continue;
 
         // New value is defiend
         if (!PyDict_Contains(dict2, key)) {
@@ -169,6 +149,8 @@ PyVarTrack_GetDiff(PyObject *dict1, PyObject *dict2) {
             fprintf(stderr, "Value changed: ");
             PyObject_Print(key, stderr, 0);
             fprintf(stderr, " -> ");
+            PyObject_Print(w, stderr, 0);
+            fprintf(stderr, " to ");
             PyObject_Print(v, stderr, 0);
             fprintf(stderr, "\n");
         }
@@ -239,11 +221,15 @@ _PyRun_InteractiveLoopObject(FILE *fp, PyObject *filename, PyCompilerFlags *flag
             _PyDebug_PrintTotalRefs();
         }
 #endif
+        // for DEBUG log output:
+        // PyObject_Print(variables, stderr, 0);
+        // fprintf(stderr, "\n");
+
         if (PyDict_Check(variables) && id >= 1 && id < 18) {
             PyObject *dict1 = PyDict_GetItem(variables, ids[id]);
             PyObject *dict2 = PyDict_GetItem(variables, ids[id-1]);
 
-            PyVarTrack_GetDiff(dict1, dict2);
+            PyRun_GetDiff(dict1, dict2);
         }
 
         id++;
@@ -266,6 +252,52 @@ PyRun_InteractiveLoopFlags(FILE *fp, const char *filename, PyCompilerFlags *flag
     Py_DECREF(filename_obj);
     return err;
 
+}
+
+
+int
+PyRun_SetVariables(PyObject *d, PyObject *variables, PyObject ** ids, int id)
+{
+    int err = -1;
+    if (!PyDict_Check(d))
+        return err;
+
+    PyObject *ignore = PyDict_New();
+    PyDict_SetItem(ignore, PyUnicode_FromString("__name__"), Py_None);
+    PyDict_SetItem(ignore, PyUnicode_FromString("__doc__"), Py_None);
+    PyDict_SetItem(ignore, PyUnicode_FromString("__package__"), Py_None);
+    PyDict_SetItem(ignore, PyUnicode_FromString("__loader__"), Py_None);
+    PyDict_SetItem(ignore, PyUnicode_FromString("__spec__"), Py_None);
+    PyDict_SetItem(ignore, PyUnicode_FromString("__annotations__"), Py_None);
+    PyDict_SetItem(ignore, PyUnicode_FromString("__builtins__"), Py_None);
+
+    PyObject *d2 = PyDict_New();
+
+    PyObject *key;
+    PyObject *it = PyObject_GetIter(d);
+    while ((key = PyIter_Next(it)) != NULL) {
+        if (PyDict_Contains(ignore, key))
+            continue;
+
+        PyObject *item = PyDict_GetItem(d, key);
+        if (!item)
+            continue;
+
+        if (PyList_Check(item)) {
+            Py_ssize_t len = PyList_Size(item);
+            PyObject *newitem = PyList_New(len);
+            for (Py_ssize_t i = 0; i < len; i++) {
+                PyObject *elem = PyList_GetItem(item, i);
+                PyList_SetItem(newitem, i, elem);
+            }
+            PyDict_SetItem(d2, key, newitem);
+        } else {
+            PyDict_SetItem(d2, key, item);
+        }
+    }
+
+    PyDict_SetItem(variables, ids[id], d2);
+    return 0;
 }
 
 
@@ -356,8 +388,7 @@ PyRun_InteractiveOneObjectEx(FILE *fp, PyObject *filename,
     v = run_mod(mod, filename, d, d, flags, arena, variables);
     // Can track local variables here
     if (ids != NULL) {
-        PyObject *key = ids[id];
-        PyDict_SetItem(variables, key, PyDict_Copy(d));
+        PyRun_SetVariables(d, variables, ids, id);
     }
 
     _PyArena_Free(arena);
