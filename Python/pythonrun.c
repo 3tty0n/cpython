@@ -59,7 +59,7 @@ static PyObject *run_mod(mod_ty, PyObject *, PyObject *, PyObject *,
                          PyCompilerFlags *, PyArena *, PyObject *);
 static PyObject *run_pyc_file(FILE *, PyObject *, PyObject *,
                               PyCompilerFlags *);
-static int PyRun_InteractiveOneObjectEx(FILE *, PyObject *, PyCompilerFlags *, PyObject *);
+static int PyRun_InteractiveOneObjectEx(FILE *, PyObject *, PyCompilerFlags *, PyObject *, PyObject **, int);
 static PyObject* pyrun_file(FILE *fp, PyObject *filename, int start,
                             PyObject *globals, PyObject *locals, int closeit,
                             PyCompilerFlags *flags);
@@ -118,10 +118,77 @@ PyRun_AnyFileExFlags(FILE *fp, const char *filename, int closeit,
     return res;
 }
 
+void
+PyVarTrack_GetDiff(PyObject *dict1, PyObject *dict2) {
+    PyObject *key;
+    PyObject *dict1_keys = PyDict_Keys(dict1);
+    PyObject *dict2_keys = PyDict_Keys(dict2);
+
+    PyObject *skip_candidates[6] = {
+        PyUnicode_FromString("__name__"),
+        PyUnicode_FromString("__doc__"),
+        PyUnicode_FromString("__package__"),
+        PyUnicode_FromString("__loader__"),
+        PyUnicode_FromString("__spec__"),
+        PyUnicode_FromString("__annotations__"),
+    };
+
+    PyObject *it = PyObject_GetIter(dict1_keys);
+    int len = sizeof(skip_candidates) / sizeof(skip_candidates[0]);
+    while ((key = PyIter_Next(it)) != NULL) {
+        int skip_flg = 0;
+        for (int i = 0; i < len; i++) {
+            PyObject *skip = skip_candidates[i];
+            int cmp = PyUnicode_Compare(key, skip);
+            if (cmp != 1) {
+                skip_flg = 1;
+                break;
+            }
+        }
+        if (skip_flg) continue;
+
+        PyObject *v = PyDict_GetItem(dict1, key);
+        if (v == NULL) continue;
+
+        // New value is defiend
+        if (!PyDict_Contains(dict2, key)) {
+            fprintf(stderr, "New variable: ");
+            PyObject_Print(key, stderr, 0);
+            fprintf(stderr, " -> ");
+            PyObject_Print(v, stderr, 0);
+            fprintf(stderr, "\n");
+            continue;
+        }
+
+        PyObject *w = PyDict_GetItem(dict2, key);
+        if (w == NULL) continue;
+
+        int cmp = PyObject_RichCompareBool(v, w, Py_EQ);
+
+        if (!cmp) {
+            fprintf(stderr, "Value changed: ");
+            PyObject_Print(key, stderr, 0);
+            fprintf(stderr, " -> ");
+            PyObject_Print(v, stderr, 0);
+            fprintf(stderr, "\n");
+        }
+    }
+    return;
+}
 
 int
 _PyRun_InteractiveLoopObject(FILE *fp, PyObject *filename, PyCompilerFlags *flags)
 {
+
+    PyObject* ids[18] = {
+        PyLong_FromLong((long)0), PyLong_FromLong((long)1), PyLong_FromLong((long)2),
+        PyLong_FromLong((long)3), PyLong_FromLong((long)4), PyLong_FromLong((long)5),
+        PyLong_FromLong((long)6), PyLong_FromLong((long)7), PyLong_FromLong((long)8),
+        PyLong_FromLong((long)9), PyLong_FromLong((long)10), PyLong_FromLong((long)11),
+        PyLong_FromLong((long)12), PyLong_FromLong((long)13), PyLong_FromLong((long)14),
+        PyLong_FromLong((long)15), PyLong_FromLong((long)16), PyLong_FromLong((long)17),
+    };
+
     PyCompilerFlags local_flags = _PyCompilerFlags_INIT;
     if (flags == NULL) {
         flags = &local_flags;
@@ -144,9 +211,11 @@ _PyRun_InteractiveLoopObject(FILE *fp, PyObject *filename, PyCompilerFlags *flag
     int err = 0;
     int ret;
     int nomem_count = 0;
-    PyObject *var = PyDict_New();
+    PyObject *variables = PyDict_New();
+    int id = 0;
+
     do {
-        ret = PyRun_InteractiveOneObjectEx(fp, filename, flags, var);
+        ret = PyRun_InteractiveOneObjectEx(fp, filename, flags, variables, ids, id);
         if (ret == -1 && PyErr_Occurred()) {
             /* Prevent an endless loop after multiple consecutive MemoryErrors
              * while still allowing an interactive command to fail with a
@@ -170,6 +239,15 @@ _PyRun_InteractiveLoopObject(FILE *fp, PyObject *filename, PyCompilerFlags *flag
             _PyDebug_PrintTotalRefs();
         }
 #endif
+        if (PyDict_Check(variables) && id >= 1 && id < 18) {
+            PyObject *dict1 = PyDict_GetItem(variables, ids[id]);
+            PyObject *dict2 = PyDict_GetItem(variables, ids[id-1]);
+
+            PyVarTrack_GetDiff(dict1, dict2);
+        }
+
+        id++;
+
     } while (ret != E_EOF);
     return err;
 }
@@ -195,7 +273,7 @@ PyRun_InteractiveLoopFlags(FILE *fp, const char *filename, PyCompilerFlags *flag
  * error on failure. */
 static int
 PyRun_InteractiveOneObjectEx(FILE *fp, PyObject *filename,
-                             PyCompilerFlags *flags, PyObject *variables)
+                             PyCompilerFlags *flags, PyObject *variables, PyObject ** ids, int id)
 {
     PyObject *m, *d, *v, *w, *oenc = NULL, *mod_name;
     mod_ty mod;
@@ -276,6 +354,12 @@ PyRun_InteractiveOneObjectEx(FILE *fp, PyObject *filename,
     }
     d = PyModule_GetDict(m);
     v = run_mod(mod, filename, d, d, flags, arena, variables);
+    // Can track local variables here
+    if (ids != NULL) {
+        PyObject *key = ids[id];
+        PyDict_SetItem(variables, key, PyDict_Copy(d));
+    }
+
     _PyArena_Free(arena);
     if (v == NULL) {
         return -1;
@@ -290,7 +374,7 @@ PyRun_InteractiveOneObject(FILE *fp, PyObject *filename, PyCompilerFlags *flags,
 {
     int res;
 
-    res = PyRun_InteractiveOneObjectEx(fp, filename, flags, variables);
+    res = PyRun_InteractiveOneObjectEx(fp, filename, flags, variables, NULL, 0);
     if (res == -1) {
         PyErr_Print();
         flush_io();
