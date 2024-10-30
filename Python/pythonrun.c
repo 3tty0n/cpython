@@ -157,9 +157,8 @@ PyRun_GetDiff(PyObject *dict1, PyObject *dict2) {
         PyObject *w = PyDict_GetItem(dict2, key);
         if (w == NULL) continue;
 
-        int cmp = PyObject_RichCompareBool(v, w, Py_EQ);
-
-        if (!cmp) {
+        int cmp = Py_Is(v, w);
+        if (!Py_Is(v, w)) {
             fprintf(stderr, "Value changed: ");
             PyObject_Print(key, stderr, 0);
             fprintf(stderr, " -> ");
