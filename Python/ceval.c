@@ -1112,7 +1112,7 @@ static int do_raise(PyThreadState *tstate, PyObject *exc, PyObject *cause);
 static int unpack_iterable(PyThreadState *, PyObject *, int, int, PyObject **);
 
 PyObject *
-PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals, PyObject *variables)
+PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
 {
     PyThreadState *tstate = PyThreadState_GET();
     if (locals == NULL) {
@@ -1134,9 +1134,6 @@ PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals, PyObject *var
     };
 
     PyObject *res = _PyEval_Vector(tstate, &desc, locals, NULL, 0, NULL);
-
-
-
     return res;
 }
 

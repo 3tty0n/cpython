@@ -2,6 +2,13 @@
 #  error "this header file must not be included directly"
 #endif
 
+// for variable tracking
+struct py_track {
+    PyObject *curr;
+    struct py_track *prev;
+    struct py_track *next;
+};
+
 PyAPI_FUNC(int) PyRun_SimpleStringFlags(const char *, PyCompilerFlags *);
 PyAPI_FUNC(int) _PyRun_SimpleFileObject(
     FILE *fp,
@@ -27,12 +34,12 @@ PyAPI_FUNC(int) PyRun_InteractiveOneFlags(
     FILE *fp,
     const char *filename,       /* decoded from the filesystem encoding */
     PyCompilerFlags *flags,
-    PyObject *variables);
+    struct py_track *py_track);
 PyAPI_FUNC(int) PyRun_InteractiveOneObject(
     FILE *fp,
     PyObject *filename,
     PyCompilerFlags *flags,
-    PyObject *variables);
+    struct py_track *py_track);
 PyAPI_FUNC(int) PyRun_InteractiveLoopFlags(
     FILE *fp,
     const char *filename,       /* decoded from the filesystem encoding */

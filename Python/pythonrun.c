@@ -35,6 +35,7 @@
 #  include "windows.h"
 #endif
 
+#include <assert.h>
 
 _Py_IDENTIFIER(builtins);
 _Py_IDENTIFIER(excepthook);
@@ -53,13 +54,26 @@ _Py_static_string(PyId_string, "<string>");
 extern "C" {
 #endif
 
+#define DEBUG(msg, o) \
+    fprintf(stderr, msg); \
+    PyObject_Print(o, stderr, 0); \
+    fprintf(stderr, "\n");
+
+
+struct py_track *
+create_py_track(PyObject *curr) {
+    struct py_track *track = malloc(sizeof(struct py_track));
+    track->curr = curr;
+    return track;
+}
+
 /* Forward */
 static void flush_io(void);
 static PyObject *run_mod(mod_ty, PyObject *, PyObject *, PyObject *,
-                         PyCompilerFlags *, PyArena *, PyObject *);
+                         PyCompilerFlags *, PyArena *);
 static PyObject *run_pyc_file(FILE *, PyObject *, PyObject *,
                               PyCompilerFlags *);
-static int PyRun_InteractiveOneObjectEx(FILE *, PyObject *, PyCompilerFlags *, PyObject *, PyObject **, int);
+static int PyRun_InteractiveOneObjectEx(FILE *, PyObject *, PyCompilerFlags *, struct py_track *);
 static PyObject* pyrun_file(FILE *fp, PyObject *filename, int start,
                             PyObject *globals, PyObject *locals, int closeit,
                             PyCompilerFlags *flags);
@@ -120,10 +134,10 @@ PyRun_AnyFileExFlags(FILE *fp, const char *filename, int closeit,
 
 void
 PyRun_GetDiff(PyObject *dict1, PyObject *dict2) {
-    PyObject *key;
     PyObject *dict1_keys = PyDict_Keys(dict1);
     PyObject *dict2_keys = PyDict_Keys(dict2);
 
+    PyObject *key;
     PyObject *it = PyObject_GetIter(dict1_keys);
     while ((key = PyIter_Next(it)) != NULL) {
         PyObject *v = PyDict_GetItem(dict1, key);
@@ -162,15 +176,6 @@ int
 _PyRun_InteractiveLoopObject(FILE *fp, PyObject *filename, PyCompilerFlags *flags)
 {
 
-    PyObject* ids[18] = {
-        PyLong_FromLong((long)0), PyLong_FromLong((long)1), PyLong_FromLong((long)2),
-        PyLong_FromLong((long)3), PyLong_FromLong((long)4), PyLong_FromLong((long)5),
-        PyLong_FromLong((long)6), PyLong_FromLong((long)7), PyLong_FromLong((long)8),
-        PyLong_FromLong((long)9), PyLong_FromLong((long)10), PyLong_FromLong((long)11),
-        PyLong_FromLong((long)12), PyLong_FromLong((long)13), PyLong_FromLong((long)14),
-        PyLong_FromLong((long)15), PyLong_FromLong((long)16), PyLong_FromLong((long)17),
-    };
-
     PyCompilerFlags local_flags = _PyCompilerFlags_INIT;
     if (flags == NULL) {
         flags = &local_flags;
@@ -193,11 +198,10 @@ _PyRun_InteractiveLoopObject(FILE *fp, PyObject *filename, PyCompilerFlags *flag
     int err = 0;
     int ret;
     int nomem_count = 0;
-    PyObject *variables = PyDict_New();
-    int id = 0;
+    struct py_track pytrack = {NULL, NULL, NULL}; // current, prev, next
 
     do {
-        ret = PyRun_InteractiveOneObjectEx(fp, filename, flags, variables, ids, id);
+        ret = PyRun_InteractiveOneObjectEx(fp, filename, flags, &pytrack);
         if (ret == -1 && PyErr_Occurred()) {
             /* Prevent an endless loop after multiple consecutive MemoryErrors
              * while still allowing an interactive command to fail with a
@@ -221,19 +225,15 @@ _PyRun_InteractiveLoopObject(FILE *fp, PyObject *filename, PyCompilerFlags *flag
             _PyDebug_PrintTotalRefs();
         }
 #endif
-        // for DEBUG log output:
-        // PyObject_Print(variables, stderr, 0);
-        // fprintf(stderr, "\n");
 
-        if (PyDict_Check(variables) && id >= 1 && id < 18) {
-            PyObject *dict1 = PyDict_GetItem(variables, ids[id]);
-            PyObject *dict2 = PyDict_GetItem(variables, ids[id-1]);
-
-            PyRun_GetDiff(dict1, dict2);
+        PyObject *dict1 = pytrack.next->curr;
+        if (dict1 != NULL) {
+            PyObject *dict2 = pytrack.curr;
+            if (dict2 != NULL) {
+                PyRun_GetDiff(dict1, dict2);
+            }
         }
-
-        id++;
-
+        pytrack = *pytrack.next;
     } while (ret != E_EOF);
     return err;
 }
@@ -255,12 +255,43 @@ PyRun_InteractiveLoopFlags(FILE *fp, const char *filename, PyCompilerFlags *flag
 }
 
 
-int
-PyRun_SetVariables(PyObject *d, PyObject *variables, PyObject ** ids, int id)
+PyObject*
+_PyRun_Copy(PyObject *o) {
+    if (!o)
+        return Py_None;
+
+    if (PyList_Check(o)) {
+        Py_ssize_t len = PyList_Size(o);
+        PyObject *newlist = PyList_New(len);
+        for (Py_ssize_t i = 0; i < len; i++) {
+            PyObject *elem = PyList_GetItem(o, i);
+            PyList_SetItem(newlist, i, elem);
+        }
+        Py_INCREF(newlist);
+        return newlist;
+    } else if (PyDict_Check(o)) {
+        PyObject *d = PyDict_New();
+        PyObject *key;
+        PyObject *it = PyObject_GetIter(o);
+        while ((key = PyIter_Next(it)) != NULL) {
+            PyObject *item = PyDict_GetItem(o, key);
+            PyObject *newitem = _PyRun_Copy(item);
+            PyDict_SetItem(d, key, newitem);
+        }
+        Py_INCREF(d);
+        return d;
+    } else {
+        return o;
+    }
+}
+
+
+struct py_track *
+PyRun_Next(PyObject *d, struct py_track *pytrack)
 {
     int err = -1;
     if (!PyDict_Check(d))
-        return err;
+        return NULL;
 
     PyObject *ignore = PyDict_New();
     PyDict_SetItem(ignore, PyUnicode_FromString("__name__"), Py_None);
@@ -283,21 +314,16 @@ PyRun_SetVariables(PyObject *d, PyObject *variables, PyObject ** ids, int id)
         if (!item)
             continue;
 
-        if (PyList_Check(item)) {
-            Py_ssize_t len = PyList_Size(item);
-            PyObject *newitem = PyList_New(len);
-            for (Py_ssize_t i = 0; i < len; i++) {
-                PyObject *elem = PyList_GetItem(item, i);
-                PyList_SetItem(newitem, i, elem);
-            }
-            PyDict_SetItem(d2, key, newitem);
-        } else {
-            PyDict_SetItem(d2, key, item);
-        }
+        PyObject *newitem = _PyRun_Copy(item);
+        PyDict_SetItem(d2, key, newitem);
     }
 
-    PyDict_SetItem(variables, ids[id], d2);
-    return 0;
+    Py_INCREF(d2);
+
+    struct py_track *new_pytrack = malloc(sizeof(struct py_track));
+    new_pytrack->curr = d2;
+    new_pytrack->prev = pytrack;
+    return new_pytrack;
 }
 
 
@@ -305,11 +331,12 @@ PyRun_SetVariables(PyObject *d, PyObject *variables, PyObject ** ids, int id)
  * error on failure. */
 static int
 PyRun_InteractiveOneObjectEx(FILE *fp, PyObject *filename,
-                             PyCompilerFlags *flags, PyObject *variables, PyObject ** ids, int id)
+                             PyCompilerFlags *flags, struct py_track *pytrack)
 {
     PyObject *m, *d, *v, *w, *oenc = NULL, *mod_name;
     mod_ty mod;
     PyArena *arena;
+    struct py_track *next;
     const char *ps1 = "", *ps2 = "", *enc = NULL;
     int errcode = 0;
     _Py_IDENTIFIER(encoding);
@@ -385,11 +412,9 @@ PyRun_InteractiveOneObjectEx(FILE *fp, PyObject *filename,
         return -1;
     }
     d = PyModule_GetDict(m);
-    v = run_mod(mod, filename, d, d, flags, arena, variables);
+    v = run_mod(mod, filename, d, d, flags, arena);
     // Can track local variables here
-    if (ids != NULL) {
-        PyRun_SetVariables(d, variables, ids, id);
-    }
+    pytrack->next = PyRun_Next(d, pytrack);
 
     _PyArena_Free(arena);
     if (v == NULL) {
@@ -401,11 +426,11 @@ PyRun_InteractiveOneObjectEx(FILE *fp, PyObject *filename,
 }
 
 int
-PyRun_InteractiveOneObject(FILE *fp, PyObject *filename, PyCompilerFlags *flags, PyObject *variables)
+PyRun_InteractiveOneObject(FILE *fp, PyObject *filename, PyCompilerFlags *flags, struct py_track *pytrack)
 {
     int res;
 
-    res = PyRun_InteractiveOneObjectEx(fp, filename, flags, variables, NULL, 0);
+    res = PyRun_InteractiveOneObjectEx(fp, filename, flags, pytrack);
     if (res == -1) {
         PyErr_Print();
         flush_io();
@@ -414,7 +439,7 @@ PyRun_InteractiveOneObject(FILE *fp, PyObject *filename, PyCompilerFlags *flags,
 }
 
 int
-PyRun_InteractiveOneFlags(FILE *fp, const char *filename_str, PyCompilerFlags *flags, PyObject *variables)
+PyRun_InteractiveOneFlags(FILE *fp, const char *filename_str, PyCompilerFlags *flags, struct py_track *pytrack)
 {
     PyObject *filename;
     int res;
@@ -424,7 +449,7 @@ PyRun_InteractiveOneFlags(FILE *fp, const char *filename_str, PyCompilerFlags *f
         PyErr_Print();
         return -1;
     }
-    res = PyRun_InteractiveOneObject(fp, filename, flags, variables);
+    res = PyRun_InteractiveOneObject(fp, filename, flags, pytrack);
     Py_DECREF(filename);
     return res;
 }
@@ -1296,7 +1321,7 @@ PyRun_StringFlags(const char *str, int start, PyObject *globals,
     mod = _PyParser_ASTFromString(str, filename, start, flags, arena);
 
     if (mod != NULL)
-        ret = run_mod(mod, filename, globals, locals, flags, arena, NULL);
+        ret = run_mod(mod, filename, globals, locals, flags, arena);
     _PyArena_Free(arena);
     return ret;
 }
@@ -1321,7 +1346,7 @@ pyrun_file(FILE *fp, PyObject *filename, int start, PyObject *globals,
 
     PyObject *ret;
     if (mod != NULL) {
-        ret = run_mod(mod, filename, globals, locals, flags, arena, NULL);
+        ret = run_mod(mod, filename, globals, locals, flags, arena);
     }
     else {
         ret = NULL;
@@ -1379,7 +1404,7 @@ flush_io(void)
 }
 
 static PyObject *
-run_eval_code_obj(PyThreadState *tstate, PyCodeObject *co, PyObject *globals, PyObject *locals, PyObject *variables)
+run_eval_code_obj(PyThreadState *tstate, PyCodeObject *co, PyObject *globals, PyObject *locals)
 {
     PyObject *v;
     /*
@@ -1404,7 +1429,7 @@ run_eval_code_obj(PyThreadState *tstate, PyCodeObject *co, PyObject *globals, Py
         }
     }
 
-    v = PyEval_EvalCode((PyObject*)co, globals, locals, variables);
+    v = PyEval_EvalCode((PyObject*)co, globals, locals);
     if (!v && _PyErr_Occurred(tstate) == PyExc_KeyboardInterrupt) {
         _Py_UnhandledKeyboardInterrupt = 1;
     }
@@ -1413,7 +1438,7 @@ run_eval_code_obj(PyThreadState *tstate, PyCodeObject *co, PyObject *globals, Py
 
 static PyObject *
 run_mod(mod_ty mod, PyObject *filename, PyObject *globals, PyObject *locals,
-        PyCompilerFlags *flags, PyArena *arena, PyObject *variables)
+        PyCompilerFlags *flags, PyArena *arena)
 {
     PyThreadState *tstate = _PyThreadState_GET();
     PyCodeObject *co = _PyAST_Compile(mod, filename, flags, -1, arena);
@@ -1425,7 +1450,7 @@ run_mod(mod_ty mod, PyObject *filename, PyObject *globals, PyObject *locals,
         return NULL;
     }
 
-    PyObject *v = run_eval_code_obj(tstate, co, globals, locals, variables);
+    PyObject *v = run_eval_code_obj(tstate, co, globals, locals);
     Py_DECREF(co);
     return v;
 }
@@ -1463,7 +1488,7 @@ run_pyc_file(FILE *fp, PyObject *globals, PyObject *locals,
     }
     fclose(fp);
     co = (PyCodeObject *)v;
-    v = run_eval_code_obj(tstate, co, globals, locals, NULL);
+    v = run_eval_code_obj(tstate, co, globals, locals);
     if (v && flags)
         flags->cf_flags |= (co->co_flags & PyCF_MASK);
     Py_DECREF(co);
