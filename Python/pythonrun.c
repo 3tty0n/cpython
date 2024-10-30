@@ -134,6 +134,8 @@ PyRun_AnyFileExFlags(FILE *fp, const char *filename, int closeit,
 
 void
 PyRun_GetDiff(PyObject *dict1, PyObject *dict2) {
+    // DEBUG("[current] ", dict1); DEBUG("[prev] ", dict2);
+
     PyObject *dict1_keys = PyDict_Keys(dict1);
     PyObject *dict2_keys = PyDict_Keys(dict2);
 
@@ -277,13 +279,17 @@ _PyRun_Copy(PyObject *o) {
         PyObject *key;
         PyObject *it = PyObject_GetIter(o);
         while ((key = PyIter_Next(it)) != NULL) {
-            PyObject *item = PyDict_GetItem(o, key);
-            PyObject *newitem = _PyRun_Copy(item);
-            PyDict_SetItem(d, key, newitem);
+          PyObject *item = PyDict_GetItem(o, key);
+          PyObject *newitem = _PyRun_Copy(item);
+          PyDict_SetItem(d, key, newitem);
         }
         Py_INCREF(d);
         return d;
     } else {
+        /* PyObject *p; */
+        /* memcpy(&p, &o, sizeof(PyObject)); */
+        /* Py_INCREF(p); */
+        /* return p; */
         return o;
     }
 }
