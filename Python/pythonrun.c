@@ -268,7 +268,7 @@ _PyRun_Copy(PyObject *o) {
         Py_ssize_t len = PyList_Size(o);
         PyObject *newlist = PyList_New(len);
         for (Py_ssize_t i = 0; i < len; i++) {
-            PyObject *elem = PyList_GetItem(o, i);
+            PyObject *elem = _PyRun_Copy(PyList_GetItem(o, i));
             PyList_SetItem(newlist, i, elem);
         }
         Py_INCREF(newlist);
