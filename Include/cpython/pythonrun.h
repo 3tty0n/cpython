@@ -5,7 +5,6 @@
 // for variable tracking
 struct py_track {
     PyObject *curr;
-    struct py_track *prev;
     struct py_track *next;
 };
 

@@ -198,7 +198,7 @@ _PyRun_InteractiveLoopObject(FILE *fp, PyObject *filename, PyCompilerFlags *flag
     int err = 0;
     int ret;
     int nomem_count = 0;
-    struct py_track pytrack = {NULL, NULL, NULL}; // current, prev, next
+    struct py_track pytrack = {NULL, NULL}; // current, next
 
     do {
         ret = PyRun_InteractiveOneObjectEx(fp, filename, flags, &pytrack);
@@ -322,7 +322,6 @@ PyRun_Next(PyObject *d, struct py_track *pytrack)
 
     struct py_track *new_pytrack = malloc(sizeof(struct py_track));
     new_pytrack->curr = d2;
-    new_pytrack->prev = pytrack;
     return new_pytrack;
 }
 
