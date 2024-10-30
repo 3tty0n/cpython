@@ -233,6 +233,10 @@ _PyRun_InteractiveLoopObject(FILE *fp, PyObject *filename, PyCompilerFlags *flag
                 PyRun_GetDiff(dict1, dict2);
             }
         }
+
+        if (pytrack.curr != NULL)
+            Py_DECREF(pytrack.curr);
+
         pytrack = *pytrack.next;
     } while (ret != E_EOF);
     return err;
